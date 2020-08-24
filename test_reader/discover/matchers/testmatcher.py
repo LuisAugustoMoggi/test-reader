@@ -55,7 +55,11 @@ class TestMatcher(Matcher):
                     else:
                         exclude_test = False
                     continue
+
                 exclude_test = self.__should_exclude_test(curr_test_config, line.strip())
+
+                if self.__should_exclude_test_next_line(curr_test_config, line.strip()):
+                    found_tests.remove(found_tests.__getitem__(found_tests.__len__() - 1))
 
         return found_tests
 
@@ -63,6 +67,14 @@ class TestMatcher(Matcher):
         exclude_test = False
         if curr_test_config.test_rules.test_exclusion_regex and \
                 curr_test_config.test_rules.test_exclusion_strategy == 'BEFORE_LINE':
+            if re.match(curr_test_config.test_rules.test_exclusion_regex, line.strip()):
+                exclude_test = True
+        return exclude_test
+
+    def __should_exclude_test_next_line(self, curr_test_config, line):
+        exclude_test = False
+        if curr_test_config.test_rules.test_exclusion_regex and \
+                curr_test_config.test_rules.test_exclusion_strategy == 'NEXT_LINE':
             if re.match(curr_test_config.test_rules.test_exclusion_regex, line.strip()):
                 exclude_test = True
         return exclude_test
@@ -79,7 +91,12 @@ class TestMatcher(Matcher):
                     else:
                         exclude_test = False
                         continue
+
                 exclude_test = self.__should_exclude_test(curr_test_config, line.strip())
+
+                if self.__should_exclude_test_next_line(curr_test_config, line.strip()):
+                    found_tests.remove(found_tests.__getitem__(found_tests.__len__() - 1))
+
         return found_tests
 
     def __get_tests_by_multiple_line_strategy(self, curr_test_config: ConfigurationTest, file_path) -> [str]:
@@ -100,7 +117,12 @@ class TestMatcher(Matcher):
                     else:
                         exclude_test = False
                         continue
+
                 exclude_test = self.__should_exclude_test(curr_test_config, line.strip())
+
+                if self.__should_exclude_test_next_line(curr_test_config, line.strip()):
+                    found_tests.remove(found_tests.__getitem__(found_tests.__len__() - 1))
+
             return found_tests
 
     @staticmethod
