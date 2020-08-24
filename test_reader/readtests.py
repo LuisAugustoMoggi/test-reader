@@ -1,5 +1,7 @@
+import os
 from test_reader.config.testconfigreader import TestConfigReader
 from test_reader.discover.testdiscovery import TestDiscovery
+from test_reader.publish.csvpublisher import CsvPublisher
 from test_reader.publish.sheetspublisher import SheetsPublisher
 from test_reader.discover.test import Test
 
@@ -27,10 +29,11 @@ class ReadTests:
             for column in self.all_columns:
                 sheet_test.append(test.extra_columns[column])
             self.sheet_tests.append(sheet_test)
-        SheetsPublisher().publish(self.sheet_tests)
 
-
-
-
-
-
+        if os.environ.get("PUBLISHER") == "sheet":
+            SheetsPublisher().publish(self.sheet_tests)
+        elif os.environ.get("PUBLISHER") == "csv":
+            CsvPublisher.publish(self.sheet_tests)
+        else:
+            print('Define envVar PUBLISHER [sheet|csv].')
+            print(self.sheet_tests)

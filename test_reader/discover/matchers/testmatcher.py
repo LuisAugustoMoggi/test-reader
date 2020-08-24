@@ -25,31 +25,38 @@ class TestMatcher(Matcher):
 
     def __get_tests_by_type(self, file_path, test_type) -> [str]:
         curr_test_config = self.test_config.get_type_by_name(test_type)
-        with open(file_path) as file:
-            if curr_test_config.test_rules.test_description_strategy == 'SAME_LINE':
-                found_tests = self.__get_tests_by_same_line_strategy(curr_test_config, file)
-            else:
-                found_tests = self.__get_tests_by_next_line_strategy(curr_test_config, file)
-        file.close()
+
+        found_tests = {}
+
+        if curr_test_config.test_rules.test_description_strategy == 'SAME_LINE':
+            found_tests = self.__get_tests_by_same_line_strategy(curr_test_config, file_path)
+        elif curr_test_config.test_rules.test_description_strategy == 'NEXT_LINE':
+            found_tests = self.__get_tests_by_next_line_strategy(curr_test_config, file_path)
+        elif curr_test_config.test_rules.test_description_strategy == 'MULTIPLE_LINE':
+            found_tests = self.__get_tests_by_multiple_line_strategy(curr_test_config, file_path)
+
         return found_tests
 
-    def __get_tests_by_next_line_strategy(self, curr_test_config, file) -> [str]:
+    def __get_tests_by_next_line_strategy(self, curr_test_config, file_path) -> [str]:
         has_test = False
         found_tests = []
         exclude_test = False
-        for line in file:
-            if curr_test_config.test_rules.test_description_strategy == 'NEXT_LINE' and has_test and line.strip() != '':
-                found_tests.append(self.__get_test_description(curr_test_config, line.strip()))
-                has_test = False
-                continue
 
-            if re.match(curr_test_config.test_rules.test_notation, line.strip()):
-                if not exclude_test:
-                    has_test = True
-                else:
-                    exclude_test = False
-                continue
-            exclude_test = self.__should_exclude_test(curr_test_config, line.strip())
+        with open(file_path) as file:
+            for line in file:
+                if curr_test_config.test_rules.test_description_strategy == 'NEXT_LINE' and has_test and line.strip() != '':
+                    found_tests.append(self.__get_test_description(curr_test_config, line.strip()))
+                    has_test = False
+                    continue
+
+                if re.match(curr_test_config.test_rules.test_notation, line.strip()):
+                    if not exclude_test:
+                        has_test = True
+                    else:
+                        exclude_test = False
+                    continue
+                exclude_test = self.__should_exclude_test(curr_test_config, line.strip())
+
         return found_tests
 
     def __should_exclude_test(self, curr_test_config, line):
@@ -60,18 +67,41 @@ class TestMatcher(Matcher):
                 exclude_test = True
         return exclude_test
 
-    def __get_tests_by_same_line_strategy(self, curr_test_config: ConfigurationTest, file) -> [str]:
+    def __get_tests_by_same_line_strategy(self, curr_test_config: ConfigurationTest, file_path) -> [str]:
         found_tests = []
         exclude_test = False
-        for line in file:
-            if re.match(curr_test_config.test_rules.test_notation, line.strip()):
-                if not exclude_test:
-                    found_tests.append(self.__get_test_description(curr_test_config, line))
-                else:
-                    exclude_test = False
-                    continue
-            exclude_test = self.__should_exclude_test(curr_test_config, line.strip())
+
+        with open(file_path) as file:
+            for line in file:
+                if re.match(curr_test_config.test_rules.test_notation, line.strip()):
+                    if not exclude_test:
+                        found_tests.append(self.__get_test_description(curr_test_config, line))
+                    else:
+                        exclude_test = False
+                        continue
+                exclude_test = self.__should_exclude_test(curr_test_config, line.strip())
         return found_tests
+
+    def __get_tests_by_multiple_line_strategy(self, curr_test_config: ConfigurationTest, file_path) -> [str]:
+        found_tests = []
+        exclude_test = False
+
+        file_content = ''
+        with open(file_path) as file:
+            lines = file.readlines()
+            for line in lines:
+                file_content += line
+
+        with open(file_path) as file:
+            for line in file:
+                if re.match(curr_test_config.test_rules.test_notation, line.strip()):
+                    if not exclude_test:
+                        found_tests.append(self.__get_test_multiline_description(curr_test_config, line, file_content))
+                    else:
+                        exclude_test = False
+                        continue
+                exclude_test = self.__should_exclude_test(curr_test_config, line.strip())
+            return found_tests
 
     @staticmethod
     def __get_test_description(curr_test_config, line):
@@ -79,6 +109,24 @@ class TestMatcher(Matcher):
         if result:
             position = result.groups().__len__()
             return result.group(position).strip()
+        else:
+            return line.strip()
+
+    @staticmethod
+    def __get_test_multiline_description(curr_test_config, line, file_content):
+        result = re.search(curr_test_config.test_rules.test_description_regex, line.strip())
+        if result:
+            position = result.groups().__len__()
+            initial_description = result.group(position).strip()
+            initial_regex = initial_description.replace("(", "\\(")
+
+            multiline_search_regex = initial_regex + curr_test_config.test_rules.test_description_multiline_regex
+            multiline_result = re.search(multiline_search_regex, file_content, re.MULTILINE)
+            if multiline_result:
+                multiline_position = multiline_result.groups().__len__()
+                return initial_description + multiline_result.group(multiline_position)
+            else:
+                return initial_description
         else:
             return line.strip()
 
